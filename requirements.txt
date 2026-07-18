@@ -1,0 +1,30 @@
+# seed-vc real-time GUI の実行時依存 (Windows / Linux + NVIDIA GPU 用).
+# seed-vc 公式 requirements.txt を基に以下を変更している:
+#   - torch nightly (cu126) 行を除去し, 安定版 2.4.0 の CUDA 12.1 ビルドに固定.
+#     PyPI の Windows 向け torch は CPU 版のみのため, extra-index-url が必須.
+#   - リアルタイム変換で import されないものを除去:
+#     gradio (Web UI 用), resemblyzer / jiwer (eval.py 用), accelerate (学習用).
+#     resemblyzer は依存の webrtcvad が Windows でビルド失敗しやすい.
+#   - FreeSimpleGUI は 5.1.1 が Tcl/Tk 9 で起動時 TclError になるため >=5.2 に更新.
+# macOS はこのファイルではなく seed-vc/requirements-mac.txt を使う (README 参照).
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.4.0+cu121
+torchvision==0.19.0+cu121
+torchaudio==2.4.0+cu121
+scipy==1.13.1
+librosa==0.10.2
+huggingface-hub>=0.28.1
+munch==4.0.0
+einops==0.8.0
+descript-audio-codec==1.0.0
+pydub==0.25.1
+transformers==4.46.3
+FreeSimpleGUI>=5.2
+soundfile==0.12.1
+sounddevice==0.5.0
+modelscope==1.18.1
+funasr==1.1.5
+numpy==1.26.4
+hydra-core==1.3.2
+pyyaml
+python-dotenv

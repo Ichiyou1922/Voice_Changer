@@ -1,5 +1,4 @@
 seed-vc/
 *.wav
-!reference/clone.wav
 .venv/
 __pycache__/

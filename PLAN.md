@@ -2,6 +2,9 @@
 
 作成日: 2026-07-18
 
+> **2026-07-18 更新**: ユーザー判断によりスコープをトラック A（seed-vc リアルタイム）のみに
+> 確定．トラック B（STT + Irodori-TTS）は実施しない．実測結果は文末の「進捗と実測」参照．
+
 ## 結論（要約）
 
 当初構想の「STT → clone TTS」パイプラインは，**リアルタイム会話用のボイスチェンジャーとしては成立しない可能性が高い**．
@@ -126,6 +129,27 @@ Discord のデスクトップ版 (Linux) が仮想ソースを認識するかは
 | STT+TTS の 6GB 同時常駐 | 未実測 — Phase 3 で検証 |
 | seed-vc で日本語音声の品質（学習データの言語分布） | 未確認 — Phase 1 で耳で検証 |
 | ゲーム等と GPU を取り合う場合の劣化 | 未検証（w-okada はサーバ分離機構を持つ．seed-vc で問題になれば構成再考） |
+
+## 進捗と実測（2026-07-18，本機 RTX 4050 Laptop 6GB で実施）
+
+- **環境構築**: `scripts/setup_seedvc.sh`（Python 3.10 venv + torch 2.4.0+cu121．
+  requirements の torch 二重指定と FreeSimpleGUI の Tk 9.0 非互換への対処を含む）．
+- **オフライン変換 E2E**: `inference.py` で examples/source/yae_0.wav →
+  reference/clone.wav への変換が成功（出力 11 秒 wav 生成を確認）．
+- **リアルタイム成立性（最重要検証点・クリア）**: `scripts/bench_realtime.py` で
+  実運転と同じ `custom_infer` 経路を README 推奨設定（block 0.18s, steps=10, cfg=0.7,
+  extra_ce=2.5s）でウォームアップ 5 回 + 30 回計測:
+  平均 102.5ms / p95 122.6ms / 最大 160.3ms < Block Time 180ms → **成立**．
+  steps=4, cfg=0.0 なら平均 65.4ms まで短縮可．VRAM ピークは allocated 920MiB．
+  想定全体遅延 ≈ アルゴリズム 380ms（0.18×2+0.02）+ デバイス側 ~100ms ≈ 480ms．
+  （なお README が主張する cfg=0.0 での 1.5 倍高速化は本機では再現せず，
+  steps=10 では cfg 0.7 と 0.0 で有意差が無かった．）
+- **仮想マイク**: `scripts/setup_virtual_mic.sh` で vc_sink + vc_mic を作成し，
+  paplay→parecord のループバックで信号到達を確認（捕捉 max -18.1dB）．
+- **GUI 起動**: `scripts/run_voice_changer.sh`（出力を PULSE_SINK=vc_sink に固定，
+  設定は config/gui_config.json を初回配置）で 30 秒間クラッシュ無しを確認．
+- **未検証（ユーザー操作が必要）**: GUI で Start をかけた実運転の音質・体感遅延，
+  Discord が vc_mic を入力デバイスとして認識するか，通話相手側での聞こえ方．
 
 ## 倫理・規約
 

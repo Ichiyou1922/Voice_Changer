@@ -74,23 +74,26 @@ def resolve_profile_command(profile: dict[str, Any]) -> list[str]:
         ]
     if pipeline != "v1-finetuned-realtime":
         raise ProfileError(f"{profile_id}: 未対応の pipeline です: {pipeline}")
-    if checkpoint is None or config is None or reference_audio is None:
+    if checkpoint is None or config is None:
         raise ProfileError(
-            f"{profile_id}: fine-tuned pipeline には checkpoint，config，reference audio が必要です．"
+            f"{profile_id}: fine-tuned pipeline には checkpoint と config が必要です．"
         )
     if not isinstance(checkpoint, str) or not isinstance(config, str):
         raise ProfileError(f"{profile_id}: モデルパスは文字列で指定してください。")
-    if not isinstance(reference_audio, str):
-        raise ProfileError(f"{profile_id}: reference_audio_path は文字列で指定してください．")
+    if reference_audio is not None and not isinstance(reference_audio, str):
+        raise ProfileError(f"{profile_id}: reference_audio_path は文字列または null で指定してください．")
 
     checkpoint_path = (REPO_DIR / checkpoint).resolve()
     config_path = (REPO_DIR / config).resolve()
-    reference_audio_path = (REPO_DIR / reference_audio).resolve()
-    for label, path in (
+    required_paths = [
         ("checkpoint", checkpoint_path),
         ("config", config_path),
-        ("reference audio", reference_audio_path),
-    ):
+    ]
+    reference_audio_path = None
+    if reference_audio is not None:
+        reference_audio_path = (REPO_DIR / reference_audio).resolve()
+        required_paths.append(("reference audio", reference_audio_path))
+    for label, path in required_paths:
         try:
             path.relative_to(REPO_DIR)
         except ValueError as exc:
@@ -100,14 +103,16 @@ def resolve_profile_command(profile: dict[str, Any]) -> list[str]:
                 f"{profile_id}: {label} が未配置です: {path.relative_to(REPO_DIR)}\n"
                 "fine-tune 完了後に ft_model.pth と対応する YAML を配置してください。"
             )
-    return [
+    command = [
         str(FINETUNED_RUNNER_PATH),
         "--checkpoint-path", str(checkpoint_path),
         "--config-path", str(config_path),
-        "--reference-audio-path", str(reference_audio_path),
         "--profile-name", name,
         "--profile-source", f"Loaded fine-tuned checkpoint: {checkpoint_path.relative_to(REPO_DIR)}",
     ]
+    if reference_audio_path is not None:
+        command.extend(["--reference-audio-path", str(reference_audio_path)])
+    return command
 
 
 def save_active_profile(document: dict[str, Any], profile_id: str) -> None:

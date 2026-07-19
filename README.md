@@ -138,16 +138,18 @@ cp seed-vc/runs/target-voice-realtime/config_dit_mel_seed_uvit_xlsr_tiny.yml \
   models/seedvc-finetuned/config_dit_mel_seed_uvit_xlsr_tiny.yml
 ```
 
-checkpoint，YAML，固定 reference 音声がそろうと，起動ランチャーの
+checkpoint と YAML がそろうと，起動ランチャーの
 `Seed-VC Fine-tuned (realtime / higher similarity)` を選べるようになる．
-現在のプロファイルでは `reference/clone.wav` を固定 prompt として使う．
+現在のプロファイルでは `reference/clone.wav` を reference 欄の初期値として使う．
+fine-tune 専用 GUI で別の音声へ変更でき，選択内容は `configs/inuse/fine-tuned.json` に保存される．
+学習データと同じ話者のクリーンな音声を指定する．
 fine-tune 後も reference prompt が必要なのは Seed-VC V1 の公式仕様であり，学習済み checkpoint だけで
 話者を固定する方式ではない．
 
 起動選択後の経路は次のように分離している．
 
 - `V1 zero-shot realtime`：組み込み tiny checkpoint を使い，GUI で reference 音声を変更できる．custom checkpoint が渡された場合は起動を拒否する．
-- `V1 fine-tuned realtime`：fine-tuned checkpoint，対応 YAML，固定 reference 音声を必須にする．GUI に reference 選択欄を出さず，いずれかが欠けた場合は起動を拒否する．
+- `V1 fine-tuned realtime`：fine-tuned checkpoint と対応 YAML を必須にする．reference は fine-tune 専用 GUI で選択し，未指定のまま変換を開始した場合はエラーにする．
 
 GUI 設定も `configs/inuse/zero-shot.json` と `configs/inuse/fine-tuned.json` に分けるため，
 reference と性能設定が別 pipeline へ引き継がれることはない．

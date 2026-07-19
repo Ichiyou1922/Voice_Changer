@@ -1,5 +1,5 @@
 diff --git a/real-time-gui.py b/real-time-gui.py
-index 38ad345..94ef599 100644
+index 38ad345..e0e4b31 100644
 --- a/real-time-gui.py
 +++ b/real-time-gui.py
 @@ -144,11 +144,15 @@ def load_models(args):
@@ -19,7 +19,7 @@ index 38ad345..94ef599 100644
          dit_checkpoint_path = args.checkpoint_path
          dit_config_path = args.config_path
      config = yaml.safe_load(open(dit_config_path, "r"))
-@@ -386,6 +390,16 @@ if __name__ == "__main__":
+@@ -386,6 +390,11 @@ if __name__ == "__main__":
          def __init__(self, args) -> None:
              self.gui_config = GUIConfig()
              self.config = Config()
@@ -27,16 +27,11 @@ index 38ad345..94ef599 100644
 +            self.inuse_config_path = f"configs/inuse/{self.pipeline_mode}.json"
 +            self.profile_name = args.profile_name
 +            self.profile_source = args.profile_source
-+            self.fixed_reference_audio_path = args.reference_audio_path
-+            if self.pipeline_mode == "fine-tuned":
-+                if not self.fixed_reference_audio_path:
-+                    raise ValueError("fine-tuned pipeline requires a fixed reference audio path")
-+                if not os.path.isfile(self.fixed_reference_audio_path):
-+                    raise FileNotFoundError(self.fixed_reference_audio_path)
++            self.default_reference_audio_path = args.reference_audio_path
              self.function = "vc"
              self.delay_time = 0
              self.hostapis = None
-@@ -403,9 +417,9 @@ if __name__ == "__main__":
+@@ -403,9 +412,9 @@ if __name__ == "__main__":
          def load(self):
              try:
                  os.makedirs("configs/inuse", exist_ok=True)
@@ -49,7 +44,7 @@ index 38ad345..94ef599 100644
                      data = json.load(j)
                      data["sr_model"] = data["sr_type"] == "sr_model"
                      data["sr_device"] = data["sr_type"] == "sr_device"
-@@ -432,7 +446,7 @@ if __name__ == "__main__":
+@@ -432,7 +441,7 @@ if __name__ == "__main__":
                              self.output_devices_indices.index(sd.default.device[1])
                          ]
              except:
@@ -58,45 +53,41 @@ index 38ad345..94ef599 100644
                      data = {
                          "sg_hostapi": self.hostapis[0],
                          "sg_wasapi_exclusive": False,
-@@ -459,35 +473,61 @@ if __name__ == "__main__":
+@@ -459,35 +468,57 @@ if __name__ == "__main__":
          def launcher(self):
              self.config = Config()
              data = self.load()
-+            if self.pipeline_mode == "fine-tuned":
-+                data["reference_audio_path"] = self.fixed_reference_audio_path
++            if (
++                self.pipeline_mode == "fine-tuned"
++                and not data.get("reference_audio_path")
++                and self.default_reference_audio_path
++            ):
++                data["reference_audio_path"] = self.default_reference_audio_path
              sg.theme("LightBlue3")
-+            if self.pipeline_mode == "zero-shot":
-+                reference_audio_layout = [
-+                    [
-+                        sg.Input(
-+                            default_text=data.get("reference_audio_path", ""),
-+                            key="reference_audio_path",
-+                        ),
-+                        sg.FileBrowse(
-+                            "choose an audio file",
-+                            initial_folder=os.path.join(os.getcwd(), "examples/reference"),
-+                            file_types=[
-+                                ("WAV Files", "*.wav"),
-+                                ("MP3 Files", "*.mp3"),
-+                                ("FLAC Files", "*.flac"),
-+                                ("M4A Files", "*.m4a"),
-+                                ("OGG Files", "*.ogg"),
-+                                ("Opus Files", "*.opus"),
-+                            ],
-+                        ),
-+                    ]
++            reference_audio_layout = [
++                [
++                    sg.Input(
++                        default_text=data.get("reference_audio_path", ""),
++                        key="reference_audio_path",
++                    ),
++                    sg.FileBrowse(
++                        "choose an audio file",
++                        initial_folder=os.path.join(os.getcwd(), "examples/reference"),
++                        file_types=[
++                            ("WAV Files", "*.wav"),
++                            ("MP3 Files", "*.mp3"),
++                            ("FLAC Files", "*.flac"),
++                            ("M4A Files", "*.m4a"),
++                            ("OGG Files", "*.ogg"),
++                            ("Opus Files", "*.opus"),
++                        ],
++                    ),
 +                ]
-+            else:
-+                reference_audio_layout = [
-+                    [
-+                        sg.Input(
-+                            default_text=self.fixed_reference_audio_path,
-+                            key="reference_audio_path",
-+                            visible=False,
-+                        ),
-+                        sg.Text("The reference prompt is fixed by the fine-tuned pipeline．"),
-+                    ]
-+                ]
++            ]
++            if self.pipeline_mode == "fine-tuned":
++                reference_audio_layout.append(
++                    [sg.Text("Choose a reference from the same speaker as the fine-tuning data．")]
++                )
              layout = [
                  [
                      sg.Frame(
@@ -133,7 +124,7 @@ index 38ad345..94ef599 100644
 +                        title=(
 +                            "Load reference audio"
 +                            if self.pipeline_mode == "zero-shot"
-+                            else "Fine-tuned V1 pipeline"
++                            else "Fine-tuned V1 reference audio"
 +                        ),
 +                        layout=reference_audio_layout,
 +                    )
@@ -141,7 +132,7 @@ index 38ad345..94ef599 100644
                  [
                      sg.Frame(
                          layout=[
-@@ -684,5 +724,7 @@ if __name__ == "__main__":
+@@ -684,5 +715,7 @@ if __name__ == "__main__":
                      sg.Text("0", key="infer_time"),
                  ],
              ]
@@ -150,7 +141,7 @@ index 38ad345..94ef599 100644
 +                f"Seed-VC - {self.profile_name}", layout=layout, finalize=True
 +            )
              self.event_handler()
-@@ -743,7 +785,7 @@ if __name__ == "__main__":
+@@ -743,7 +776,7 @@ if __name__ == "__main__":
                              "extra_time": values["extra_time"],
                              "extra_time_right": values["extra_time_right"],
                          }
@@ -159,7 +150,7 @@ index 38ad345..94ef599 100644
                              json.dump(settings, j)
                          if self.stream is not None:
                              self.delay_time = (
-@@ -1176,6 +1218,10 @@ if __name__ == "__main__":
+@@ -1176,6 +1209,10 @@ if __name__ == "__main__":
      parser = argparse.ArgumentParser()
 +    parser.add_argument("--pipeline-mode", choices=["zero-shot", "fine-tuned"], default="zero-shot")
      parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to the model checkpoint")

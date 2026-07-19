@@ -83,14 +83,14 @@ class ResolveProfileCommandTest(unittest.TestCase):
                 str(launcher.FINETUNED_RUNNER_PATH),
                 "--checkpoint-path", str(model_dir / "ft_model.pth"),
                 "--config-path", str(model_dir / "config.yml"),
-                "--reference-audio-path", str(model_dir / "reference.wav"),
                 "--profile-name", "Fine",
                 "--profile-source", "Loaded fine-tuned checkpoint: models/ft_model.pth",
+                "--reference-audio-path", str(model_dir / "reference.wav"),
             ],
         )
 
     def test_rejects_partial_finetuned_pipeline_definition(self):
-        with self.assertRaisesRegex(launcher.ProfileError, "checkpoint，config，reference audio"):
+        with self.assertRaisesRegex(launcher.ProfileError, "checkpoint と config"):
             launcher.resolve_profile_command(
                 {
                     "id": "bad",
@@ -101,6 +101,23 @@ class ResolveProfileCommandTest(unittest.TestCase):
                     "reference_audio_path": None,
                 }
             )
+
+    def test_finetuned_profile_can_choose_reference_in_gui(self):
+        model_dir = self.repo_dir / "models"
+        model_dir.mkdir()
+        (model_dir / "ft_model.pth").touch()
+        (model_dir / "config.yml").touch()
+        command = launcher.resolve_profile_command(
+            {
+                "id": "fine-no-default-reference",
+                "name": "Fine",
+                "pipeline": "v1-finetuned-realtime",
+                "checkpoint_path": "models/ft_model.pth",
+                "config_path": "models/config.yml",
+                "reference_audio_path": None,
+            }
+        )
+        self.assertNotIn("--reference-audio-path", command)
 
     def test_zero_shot_rejects_custom_checkpoint(self):
         with self.assertRaisesRegex(launcher.ProfileError, "custom model"):

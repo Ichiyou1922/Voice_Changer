@@ -9,6 +9,8 @@ cd "$DIR"
 cd seed-vc
 [ -d .venv ] || uv venv --python 3.10 .venv
 
+"$DIR/scripts/apply_seedvc_profile_ui_patch.sh"
+
 # requirements.txt は torch を nightly cu126 と 2.4.0 固定で二重指定しており
 # そのままでは依存解決に失敗するため, nightly 行を除外して 2.4.0 (cu121) を使う
 grep -v "nightly/cu126" requirements.txt > /tmp/seedvc_req_filtered.txt

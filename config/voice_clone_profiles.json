@@ -1,0 +1,23 @@
+{
+  "active_profile": "seedvc-finetuned-realtime",
+  "profiles": [
+    {
+      "id": "seedvc-zero-shot",
+      "name": "Seed-VC Zero-shot (realtime)",
+      "description": "参照音声だけで使える標準のリアルタイム変換。モデルは公式の seed-uvit-tat-xlsr-tiny。",
+      "pipeline": "v1-zero-shot-realtime",
+      "checkpoint_path": null,
+      "config_path": null,
+      "reference_audio_path": null
+    },
+    {
+      "id": "seedvc-finetuned-realtime",
+      "name": "Seed-VC Fine-tuned (realtime / higher similarity)",
+      "description": "話者データで fine-tune した real-time tiny モデル。checkpoint と YAML を配置すると選択可能。",
+      "pipeline": "v1-finetuned-realtime",
+      "checkpoint_path": "models/seedvc-finetuned/ft_model.pth",
+      "config_path": "models/seedvc-finetuned/config_dit_mel_seed_uvit_xlsr_tiny.yml",
+      "reference_audio_path": "reference/clone.wav"
+    }
+  ]
+}

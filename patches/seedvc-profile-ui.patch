@@ -1,0 +1,172 @@
+diff --git a/real-time-gui.py b/real-time-gui.py
+index 38ad345..94ef599 100644
+--- a/real-time-gui.py
++++ b/real-time-gui.py
+@@ -144,11 +144,15 @@ def load_models(args):
+     global fp16
+     fp16 = args.fp16
+     print(f"Using fp16: {fp16}")
+-    if args.checkpoint_path is None or args.checkpoint_path == "":
++    if args.pipeline_mode == "zero-shot":
++        if args.checkpoint_path or args.config_path:
++            raise ValueError("zero-shot pipeline does not accept a custom checkpoint or config")
+         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                          "DiT_uvit_tat_xlsr_ema.pth",
+                                                                          "config_dit_mel_seed_uvit_xlsr_tiny.yml")
+     else:
++        if not args.checkpoint_path or not args.config_path:
++            raise ValueError("fine-tuned pipeline requires both checkpoint and config")
+         dit_checkpoint_path = args.checkpoint_path
+         dit_config_path = args.config_path
+     config = yaml.safe_load(open(dit_config_path, "r"))
+@@ -386,6 +390,16 @@ if __name__ == "__main__":
+         def __init__(self, args) -> None:
+             self.gui_config = GUIConfig()
+             self.config = Config()
++            self.pipeline_mode = args.pipeline_mode
++            self.inuse_config_path = f"configs/inuse/{self.pipeline_mode}.json"
++            self.profile_name = args.profile_name
++            self.profile_source = args.profile_source
++            self.fixed_reference_audio_path = args.reference_audio_path
++            if self.pipeline_mode == "fine-tuned":
++                if not self.fixed_reference_audio_path:
++                    raise ValueError("fine-tuned pipeline requires a fixed reference audio path")
++                if not os.path.isfile(self.fixed_reference_audio_path):
++                    raise FileNotFoundError(self.fixed_reference_audio_path)
+             self.function = "vc"
+             self.delay_time = 0
+             self.hostapis = None
+@@ -403,9 +417,9 @@ if __name__ == "__main__":
+         def load(self):
+             try:
+                 os.makedirs("configs/inuse", exist_ok=True)
+-                if not os.path.exists("configs/inuse/config.json"):
+-                    shutil.copy("configs/config.json", "configs/inuse/config.json")
+-                with open("configs/inuse/config.json", "r") as j:
++                if not os.path.exists(self.inuse_config_path):
++                    shutil.copy("configs/config.json", self.inuse_config_path)
++                with open(self.inuse_config_path, "r") as j:
+                     data = json.load(j)
+                     data["sr_model"] = data["sr_type"] == "sr_model"
+                     data["sr_device"] = data["sr_type"] == "sr_device"
+@@ -432,7 +446,7 @@ if __name__ == "__main__":
+                             self.output_devices_indices.index(sd.default.device[1])
+                         ]
+             except:
+-                with open("configs/inuse/config.json", "w") as j:
++                with open(self.inuse_config_path, "w") as j:
+                     data = {
+                         "sg_hostapi": self.hostapis[0],
+                         "sg_wasapi_exclusive": False,
+@@ -459,35 +473,61 @@ if __name__ == "__main__":
+         def launcher(self):
+             self.config = Config()
+             data = self.load()
++            if self.pipeline_mode == "fine-tuned":
++                data["reference_audio_path"] = self.fixed_reference_audio_path
+             sg.theme("LightBlue3")
++            if self.pipeline_mode == "zero-shot":
++                reference_audio_layout = [
++                    [
++                        sg.Input(
++                            default_text=data.get("reference_audio_path", ""),
++                            key="reference_audio_path",
++                        ),
++                        sg.FileBrowse(
++                            "choose an audio file",
++                            initial_folder=os.path.join(os.getcwd(), "examples/reference"),
++                            file_types=[
++                                ("WAV Files", "*.wav"),
++                                ("MP3 Files", "*.mp3"),
++                                ("FLAC Files", "*.flac"),
++                                ("M4A Files", "*.m4a"),
++                                ("OGG Files", "*.ogg"),
++                                ("Opus Files", "*.opus"),
++                            ],
++                        ),
++                    ]
++                ]
++            else:
++                reference_audio_layout = [
++                    [
++                        sg.Input(
++                            default_text=self.fixed_reference_audio_path,
++                            key="reference_audio_path",
++                            visible=False,
++                        ),
++                        sg.Text("The reference prompt is fixed by the fine-tuned pipeline．"),
++                    ]
++                ]
+             layout = [
+                 [
+                     sg.Frame(
+-                        title="Load reference audio",
++                        title="Loaded voice clone profile",
+                         layout=[
+-                            [
+-                                sg.Input(
+-                                    default_text=data.get("reference_audio_path", ""),
+-                                    key="reference_audio_path",
+-                                ),
+-                                sg.FileBrowse(
+-                                    "choose an audio file",
+-                                    initial_folder=os.path.join(
+-                                        os.getcwd(), "examples/reference"
+-                                    ),
+-                                    file_types=[
+-                                        ("WAV Files", "*.wav"),
+-                                        ("MP3 Files", "*.mp3"),
+-                                        ("FLAC Files", "*.flac"),
+-                                        ("M4A Files", "*.m4a"),
+-                                        ("OGG Files", "*.ogg"),
+-                                        ("Opus Files", "*.opus"),
+-                                    ],
+-                                ),
+-                            ],
++                            [sg.Text(self.profile_name, text_color="#006400", font=("Any", 12, "bold"))],
++                            [sg.Text(self.profile_source, size=(72, 2))],
+                         ],
+                     )
+                 ],
++                [
++                    sg.Frame(
++                        title=(
++                            "Load reference audio"
++                            if self.pipeline_mode == "zero-shot"
++                            else "Fine-tuned V1 pipeline"
++                        ),
++                        layout=reference_audio_layout,
++                    )
++                ],
+                 [
+                     sg.Frame(
+                         layout=[
+@@ -684,5 +724,7 @@ if __name__ == "__main__":
+                     sg.Text("0", key="infer_time"),
+                 ],
+             ]
+-            self.window = sg.Window("Seed-VC - GUI", layout=layout, finalize=True)
++            self.window = sg.Window(
++                f"Seed-VC - {self.profile_name}", layout=layout, finalize=True
++            )
+             self.event_handler()
+@@ -743,7 +785,7 @@ if __name__ == "__main__":
+                             "extra_time": values["extra_time"],
+                             "extra_time_right": values["extra_time_right"],
+                         }
+-                        with open("configs/inuse/config.json", "w") as j:
++                        with open(self.inuse_config_path, "w") as j:
+                             json.dump(settings, j)
+                         if self.stream is not None:
+                             self.delay_time = (
+@@ -1176,6 +1218,10 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
++    parser.add_argument("--pipeline-mode", choices=["zero-shot", "fine-tuned"], default="zero-shot")
+     parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to the model checkpoint")
+     parser.add_argument("--config-path", type=str, default=None, help="Path to the vocoder checkpoint")
++    parser.add_argument("--reference-audio-path", type=str, default=None)
++    parser.add_argument("--profile-name", type=str, default="Seed-VC Zero-shot (realtime)")
++    parser.add_argument("--profile-source", type=str, default="Built-in zero-shot checkpoint")
+     parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
+     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
+     args = parser.parse_args()
